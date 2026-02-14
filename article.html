@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>文章详情</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="article-page">
+      <a class="back-link" href="index.html">← 返回首页</a>
+      <h1 id="article-title">文章标题</h1>
+      <div id="article-content" class="article-content">正在加载...</div>
+    </div>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const file = params.get("file");
+      const titleEl = document.getElementById("article-title");
+      const contentEl = document.getElementById("article-content");
+
+      if (!file || !/^[\w.-]+\.txt$/i.test(file)) {
+        titleEl.textContent = "无法读取文章";
+        contentEl.textContent = "请从首页选择文章。";
+      } else {
+        titleEl.textContent = file.replace(/\.txt$/i, "");
+        fetch(`article/${encodeURIComponent(file)}`)
+          .then((res) => {
+            if (!res.ok) {
+              throw new Error("文章不存在");
+            }
+            return res.text();
+          })
+          .then((text) => {
+            contentEl.textContent = text;
+          })
+          .catch(() => {
+            contentEl.textContent = "无法加载文章内容，请检查文件是否存在。";
+          });
+      }
+    </script>
+  </body>
+</html>

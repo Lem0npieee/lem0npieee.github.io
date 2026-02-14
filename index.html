@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>lem0npieee | 个人主页</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <aside class="profile">
+        <div class="avatar-wrap">
+          <img class="avatar" src="touxiang.png" alt="头像" />
+        </div>
+        <h1 class="name">Lem0nP1eee</h1>
+        <p class="tagline">热爱技术与创作，记录成长的每一步。</p>
+        <div class="info-card">
+          <h2 class="section-title">个人信息</h2>
+          <ul class="info-list">
+            <li>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 3L2 8l10 5 10-5-10-5zm-7 8v6l7 4 7-4v-6l-7 4-7-4z"
+                  fill="currentColor"
+                />
+              </svg>
+              <span>学校：示例大学</span>
+            </li>
+            <li>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M4 5h16v3H4V5zm0 5h16v9H4v-9zm3 2v5h10v-5H7z"
+                  fill="currentColor"
+                />
+              </svg>
+              <span>专业：计算机科学与技术</span>
+            </li>
+            <li>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 2a6 6 0 016 6c0 4-6 12-6 12S6 12 6 8a6 6 0 016-6zm0 8a2 2 0 100-4 2 2 0 000 4z"
+                  fill="currentColor"
+                />
+              </svg>
+              <span>方向：前端 / 算法</span>
+            </li>
+            <li>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M4 4h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2zm0 2v.5l8 5 8-5V6H4zm16 12V8.5l-7.5 4.7a1 1 0 01-1 0L4 8.5V18h16z"
+                  fill="currentColor"
+                />
+              </svg>
+              <span>邮箱：lem0n@example.com</span>
+            </li>
+          </ul>
+        </div>
+      </aside>
+
+      <main class="articles">
+        <div class="articles-header">
+          <h2>文章列表</h2>
+          <p class="hint">将 txt 文件放入 article 文件夹即可自动展示。</p>
+        </div>
+        <div id="article-list" class="article-list">
+          <div class="empty">正在加载文章...</div>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      const repoOwner = "lem0npieee";
+      const repoName = "lem0npieee.github.io";
+      const articleDir = "article";
+      const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${articleDir}`;
+      const listEl = document.getElementById("article-list");
+
+      const renderEmpty = (message) => {
+        listEl.innerHTML = `<div class="empty">${message}</div>`;
+      };
+
+      const renderList = (files) => {
+        if (!files.length) {
+          renderEmpty("暂时还没有文章，添加 txt 文件后会自动出现。");
+          return;
+        }
+        listEl.innerHTML = files
+          .map((file) => {
+            const title = file.name.replace(/\.txt$/i, "");
+            const link = `article.html?file=${encodeURIComponent(file.name)}`;
+            return `<a class="article-item" href="${link}">
+                <div class="article-title">${title}</div>
+                <div class="article-meta">文件：${file.name}</div>
+              </a>`;
+          })
+          .join("");
+      };
+
+      fetch(apiUrl)
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error("无法获取文章列表");
+          }
+          return res.json();
+        })
+        .then((data) => {
+          const files = data
+            .filter((item) => item.type === "file" && item.name.endsWith(".txt"))
+            .sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
+          renderList(files);
+        })
+        .catch(() => {
+          renderEmpty("无法获取文章列表，请检查仓库是否公开且 article 目录存在。");
+        });
+    </script>
+  </body>
+</html>
