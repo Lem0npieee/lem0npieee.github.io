@@ -495,24 +495,31 @@
         return tryBranch(0);
       };
 
-      if (!file || !/^[\w.-]+\.(md|markdown)$/i.test(file)) {
+      const resolvedFile = (file || "").trim();
+      const isValidFile =
+        resolvedFile &&
+        !resolvedFile.includes("/") &&
+        !resolvedFile.includes("\\") &&
+        /\.(md|markdown)$/i.test(resolvedFile);
+
+      if (!isValidFile) {
         titleEl.textContent = "无法读取文章";
         contentEl.textContent = "请从首页选择文章。";
       } else {
-        titleEl.textContent = file
+        titleEl.textContent = resolvedFile
           .replace(/\.markdown$/i, "")
           .replace(/\.md$/i, "");
-        fetchFromSameOrigin(file)
+        fetchFromSameOrigin(resolvedFile)
           .then((text) => {
             renderMarkdown(text);
           })
           .catch(() =>
-            fetchFromRawGitHub(file)
+            fetchFromRawGitHub(resolvedFile)
               .then((text) => {
                 renderMarkdown(text);
               })
               .catch(() =>
-                fetchFromGitHub(file)
+                fetchFromGitHub(resolvedFile)
                   .then((text) => {
                     renderMarkdown(text);
                   })
