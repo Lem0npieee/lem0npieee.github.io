@@ -13,7 +13,6 @@
       <div id="article-content" class="article-content">正在加载...</div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
       const params = new URLSearchParams(window.location.search);
       const file = params.get("file");
@@ -53,20 +52,151 @@
         return `${attachmentsDir}/${cleaned}`;
       };
 
-      const renderMarkdown = (text) => {
-        if (typeof marked === "undefined") {
-          contentEl.textContent = "Markdown 渲染库加载失败，请稍后重试。";
-          return;
-        }
-        const renderer = new marked.Renderer();
-        renderer.image = (href, title, text) => {
-          const src = normalizeImageUrl(href || "");
-          const titleAttr = title ? ` title="${title}"` : "";
-          const alt = text || "";
-          return `<img src="${src}" alt="${alt}"${titleAttr}>`;
+      const escapeHtml = (value) =>
+        value
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+
+      const parseInline = (text) => {
+        const placeholders = [];
+        const addPlaceholder = (html) => {
+          const key = `@@@${placeholders.length}@@@`;
+          placeholders.push(html);
+          return key;
         };
-        marked.setOptions({ breaks: true, renderer });
-        contentEl.innerHTML = marked.parse(text);
+        let working = text || "";
+
+        working = working.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => {
+          const src = normalizeImageUrl(url.trim());
+          const safeAlt = escapeHtml(alt || "");
+          return addPlaceholder(`<img src="${src}" alt="${safeAlt}">`);
+        });
+
+        working = working.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
+          const href = url.trim();
+          const safeLabel = escapeHtml(label || "");
+          return addPlaceholder(`<a href="${href}">${safeLabel}</a>`);
+        });
+
+        const segments = working.split(/`/);
+        const parsed = segments
+          .map((segment, index) => {
+            if (index % 2 === 1) {
+              return `<code>${escapeHtml(segment)}</code>`;
+            }
+            let safe = escapeHtml(segment);
+            safe = safe.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+            safe = safe.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+            return safe;
+          })
+          .join("");
+
+        return placeholders.reduce(
+          (acc, html, index) => acc.replace(`@@@${index}@@@`, html),
+          parsed
+        );
+      };
+
+      const markdownToHtml = (text) => {
+        const lines = (text || "").replace(/\r\n/g, "\n").split("\n");
+        let html = "";
+        let inCode = false;
+        let codeLang = "";
+        let codeLines = [];
+        let listType = null;
+
+        const flushList = () => {
+          if (listType) {
+            html += `</${listType}>`;
+            listType = null;
+          }
+        };
+
+        const flushCode = () => {
+          if (!inCode) {
+            return;
+          }
+          const code = escapeHtml(codeLines.join("\n"));
+          const langClass = codeLang ? ` class="language-${escapeHtml(codeLang)}"` : "";
+          html += `<pre><code${langClass}>${code}</code></pre>`;
+          inCode = false;
+          codeLang = "";
+          codeLines = [];
+        };
+
+        lines.forEach((line) => {
+          if (line.startsWith("```")) {
+            if (inCode) {
+              flushCode();
+            } else {
+              flushList();
+              inCode = true;
+              codeLang = line.slice(3).trim();
+            }
+            return;
+          }
+
+          if (inCode) {
+            codeLines.push(line);
+            return;
+          }
+
+          if (!line.trim()) {
+            flushList();
+            return;
+          }
+
+          const headingMatch = line.match(/^(#{1,3})\s+(.*)$/);
+          if (headingMatch) {
+            flushList();
+            const level = headingMatch[1].length;
+            html += `<h${level}>${parseInline(headingMatch[2])}</h${level}>`;
+            return;
+          }
+
+          if (/^>\s?/.test(line)) {
+            flushList();
+            html += `<blockquote>${parseInline(line.replace(/^>\s?/, ""))}</blockquote>`;
+            return;
+          }
+
+          const unorderedMatch = line.match(/^[-*]\s+(.*)$/);
+          if (unorderedMatch) {
+            if (listType !== "ul") {
+              flushList();
+              listType = "ul";
+              html += "<ul>";
+            }
+            html += `<li>${parseInline(unorderedMatch[1])}</li>`;
+            return;
+          }
+
+          const orderedMatch = line.match(/^\d+\.\s+(.*)$/);
+          if (orderedMatch) {
+            if (listType !== "ol") {
+              flushList();
+              listType = "ol";
+              html += "<ol>";
+            }
+            html += `<li>${parseInline(orderedMatch[1])}</li>`;
+            return;
+          }
+
+          flushList();
+          html += `<p>${parseInline(line)}</p>`;
+        });
+
+        flushList();
+        flushCode();
+
+        return html;
+      };
+
+      const renderMarkdown = (text) => {
+        contentEl.innerHTML = markdownToHtml(text);
       };
 
       const fetchFromSameOrigin = (fileName) =>
