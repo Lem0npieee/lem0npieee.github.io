@@ -55,7 +55,13 @@
         if (cleaned.startsWith(`${attachmentsDir}/`)) {
           return new URL(`${articleDir}/${cleaned}`, pageBase).toString();
         }
-        return new URL(`${articleDir}/${cleaned}`, pageBase).toString();
+        if (cleaned.includes("/")) {
+          return new URL(`${articleDir}/${cleaned}`, pageBase).toString();
+        }
+        return new URL(
+          `${articleDir}/${attachmentsDir}/${cleaned}`,
+          pageBase
+        ).toString();
       };
 
       const escapeHtml = (value) =>
