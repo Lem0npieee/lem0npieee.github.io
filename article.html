@@ -43,13 +43,13 @@
         while (cleaned.startsWith("../")) {
           cleaned = cleaned.slice(3);
         }
-        if (
-          cleaned.startsWith(`${attachmentsDir}/`) ||
-          cleaned.startsWith(`${articleDir}/${attachmentsDir}/`)
-        ) {
+        if (cleaned.startsWith(`${articleDir}/`)) {
           return cleaned;
         }
-        return `${attachmentsDir}/${cleaned}`;
+        if (cleaned.startsWith(`${attachmentsDir}/`)) {
+          return `${articleDir}/${cleaned}`;
+        }
+        return `${articleDir}/${cleaned}`;
       };
 
       const escapeHtml = (value) =>
@@ -234,6 +234,26 @@
           });
       };
 
+      const fetchFromRawGitHub = (fileName) => {
+        const branches = ["main", "master"];
+        const encoded = encodeURIComponent(fileName);
+        const tryBranch = (index) => {
+          if (index >= branches.length) {
+            return Promise.reject(new Error("raw-github"));
+          }
+          const rawUrl = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${branches[index]}/${articleDir}/${encoded}`;
+          return fetch(rawUrl)
+            .then((res) => {
+              if (!res.ok) {
+                throw new Error("raw-branch");
+              }
+              return res.text();
+            })
+            .catch(() => tryBranch(index + 1));
+        };
+        return tryBranch(0);
+      };
+
       if (!file || !/^[\w.-]+\.(md|markdown)$/i.test(file)) {
         titleEl.textContent = "无法读取文章";
         contentEl.textContent = "请从首页选择文章。";
@@ -246,14 +266,20 @@
             renderMarkdown(text);
           })
           .catch(() =>
-            fetchFromGitHub(file)
+            fetchFromRawGitHub(file)
               .then((text) => {
                 renderMarkdown(text);
               })
-              .catch(() => {
-                contentEl.textContent =
-                  "无法加载文章内容，请检查文件是否存在或仓库是否公开。";
-              })
+              .catch(() =>
+                fetchFromGitHub(file)
+                  .then((text) => {
+                    renderMarkdown(text);
+                  })
+                  .catch(() => {
+                    contentEl.textContent =
+                      "无法加载文章内容，请检查文件是否存在或仓库是否公开。";
+                  })
+              )
           );
       }
     </script>
