@@ -291,20 +291,24 @@
             continue;
           }
 
-          if (/^\s{4,}|^\t/.test(line)) {
-            flushList();
-            closeBlockquotes();
-            inIndentedCode = true;
-            indentedCodeLines.push(line.replace(/^\s{4}|^\t/, ""));
-            continue;
-          }
-          if (inIndentedCode) {
-            flushIndentedCode();
-          }
-
           if (!line.trim()) {
             flushList();
             closeBlockquotes();
+            continue;
+          }
+
+          const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+          if (headingMatch) {
+            flushList();
+            closeBlockquotes();
+            const level = headingMatch[1].length;
+            html += `<h${level}>${parseInline(headingMatch[2], refs)}</h${level}>`;
+            const nextIsSetext =
+              i + 1 < lines.length && /^(=+|-+)\s*$/.test(lines[i + 1]);
+            if (nextIsSetext) {
+              html += "<hr>";
+              i += 1;
+            }
             continue;
           }
 
@@ -316,15 +320,6 @@
             const level = setextMatch[1].startsWith("=") ? 1 : 2;
             html += `<h${level}>${parseInline(line.trim(), refs)}</h${level}>`;
             i += 1;
-            continue;
-          }
-
-          const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
-          if (headingMatch) {
-            flushList();
-            closeBlockquotes();
-            const level = headingMatch[1].length;
-            html += `<h${level}>${parseInline(headingMatch[2], refs)}</h${level}>`;
             continue;
           }
 
@@ -348,7 +343,7 @@
 
           closeBlockquotes();
 
-          if (/^(\*\s*\*\s*\*|-{3,}|_{3,})\s*$/.test(line)) {
+          if (/^(\*\s*\*\s*\*|-{3,}|_{3,}|={3,})\s*$/.test(line)) {
             flushList();
             html += "<hr>";
             continue;
@@ -362,6 +357,9 @@
 
           const listMatch = line.match(/^(\s*)([-*+]|\d+\.)\s+(.*)$/);
           if (listMatch) {
+            if (inIndentedCode) {
+              flushIndentedCode();
+            }
             const indent = listMatch[1].replace(/\t/g, "    ").length;
             const depth = Math.floor(indent / 2) + 1;
             const type = /\d+\./.test(listMatch[2]) ? "ol" : "ul";
@@ -388,6 +386,17 @@
               html += `<li>${parseInline(itemText, refs)}</li>`;
             }
             continue;
+          }
+
+          if (/^\s{4,}|^\t/.test(line)) {
+            flushList();
+            closeBlockquotes();
+            inIndentedCode = true;
+            indentedCodeLines.push(line.replace(/^\s{4}|^\t/, ""));
+            continue;
+          }
+          if (inIndentedCode) {
+            flushIndentedCode();
           }
 
           flushList();
