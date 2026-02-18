@@ -31,6 +31,7 @@
         : defaultRepo;
       const repoOwner = inferredOwner;
       const repoName = inferredRepo;
+      const pageBase = new URL("./", window.location.href);
 
       const normalizeImageUrl = (url) => {
         if (!url) {
@@ -44,12 +45,12 @@
           cleaned = cleaned.slice(3);
         }
         if (cleaned.startsWith(`${articleDir}/`)) {
-          return cleaned;
+          return new URL(cleaned, pageBase).toString();
         }
         if (cleaned.startsWith(`${attachmentsDir}/`)) {
-          return `${articleDir}/${cleaned}`;
+          return new URL(`${articleDir}/${cleaned}`, pageBase).toString();
         }
-        return `${articleDir}/${cleaned}`;
+        return new URL(`${articleDir}/${cleaned}`, pageBase).toString();
       };
 
       const escapeHtml = (value) =>
@@ -200,7 +201,7 @@
       };
 
       const fetchFromSameOrigin = (fileName) =>
-        fetch(`${articleDir}/${encodeURIComponent(fileName)}`).then((res) => {
+        fetch(new URL(`${articleDir}/${encodeURIComponent(fileName)}`, pageBase)).then((res) => {
           if (!res.ok) {
             throw new Error("same-origin");
           }

@@ -231,6 +231,13 @@ body {
   font-size: 0.95em;
 }
 
+.article-content pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  display: block;
+}
+
 @media (max-width: 960px) {
   .page {
     flex-direction: column;
