@@ -192,8 +192,6 @@
         let codeLines = [];
         let listStack = [];
         let blockquoteLevel = 0;
-        let inIndentedCode = false;
-        let indentedCodeLines = [];
 
         const closeBlockquotes = () => {
           while (blockquoteLevel > 0) {
@@ -223,16 +221,6 @@
           inCode = false;
           codeLang = "";
           codeLines = [];
-        };
-
-        const flushIndentedCode = () => {
-          if (!inIndentedCode) {
-            return;
-          }
-          const code = escapeHtml(indentedCodeLines.join("\n"));
-          html += `<pre><code>${code}</code></pre>`;
-          inIndentedCode = false;
-          indentedCodeLines = [];
         };
 
         const splitTableRow = (row) => {
@@ -279,7 +267,6 @@
         for (let i = 0; i < lines.length; i += 1) {
           const line = lines[i];
           if (line.startsWith("```")) {
-            flushIndentedCode();
             if (inCode) {
               flushCode();
             } else {
@@ -362,9 +349,6 @@
 
           const listMatch = line.match(/^(\s*)([-*+]|\d+\.)\s+(.*)$/);
           if (listMatch) {
-            if (inIndentedCode) {
-              flushIndentedCode();
-            }
             const indent = listMatch[1].replace(/\t/g, "    ").length;
             const depth = Math.floor(indent / 2) + 1;
             const type = /\d+\./.test(listMatch[2]) ? "ol" : "ul";
@@ -393,24 +377,12 @@
             continue;
           }
 
-          if (/^\s{4,}|^\t/.test(line)) {
-            flushList();
-            closeBlockquotes();
-            inIndentedCode = true;
-            indentedCodeLines.push(line.replace(/^\s{4}|^\t/, ""));
-            continue;
-          }
-          if (inIndentedCode) {
-            flushIndentedCode();
-          }
-
           flushList();
           html += `<p>${parseInline(line, refs)}</p>`;
         }
 
         flushList();
         flushCode();
-        flushIndentedCode();
         closeBlockquotes();
 
         if (footnoteOrder.length) {
