@@ -21,6 +21,17 @@
       const contentEl = document.getElementById("article-content");
       const articleDir = "article";
       const attachmentsDir = "attachments";
+      const defaultOwner = "lem0npieee";
+      const defaultRepo = "lem0npieee.github.io";
+      const host = window.location.hostname;
+      const inferredOwner = host.endsWith("github.io")
+        ? host.split(".")[0]
+        : defaultOwner;
+      const inferredRepo = host.endsWith("github.io")
+        ? `${inferredOwner}.github.io`
+        : defaultRepo;
+      const repoOwner = inferredOwner;
+      const repoName = inferredRepo;
 
       const normalizeImageUrl = (url) => {
         if (!url) {
@@ -58,6 +69,41 @@
         contentEl.innerHTML = marked.parse(text);
       };
 
+      const fetchFromSameOrigin = (fileName) =>
+        fetch(`${articleDir}/${encodeURIComponent(fileName)}`).then((res) => {
+          if (!res.ok) {
+            throw new Error("same-origin");
+          }
+          return res.text();
+        });
+
+      const fetchFromGitHub = (fileName) => {
+        const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${articleDir}/${encodeURIComponent(
+          fileName
+        )}`;
+        return fetch(apiUrl)
+          .then((res) => {
+            if (!res.ok) {
+              throw new Error("github-api");
+            }
+            return res.json();
+          })
+          .then((data) => {
+            if (!data.content) {
+              throw new Error("github-content");
+            }
+            const base64 = data.content.replace(/\n/g, "");
+            const decoded = atob(base64);
+            return decodeURIComponent(
+              Array.from(decoded)
+                .map((char) =>
+                  `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`
+                )
+                .join("")
+            );
+          });
+      };
+
       if (!file || !/^[\w.-]+\.(md|markdown)$/i.test(file)) {
         titleEl.textContent = "无法读取文章";
         contentEl.textContent = "请从首页选择文章。";
@@ -65,19 +111,20 @@
         titleEl.textContent = file
           .replace(/\.markdown$/i, "")
           .replace(/\.md$/i, "");
-        fetch(`${articleDir}/${encodeURIComponent(file)}`)
-          .then((res) => {
-            if (!res.ok) {
-              throw new Error("文章不存在");
-            }
-            return res.text();
-          })
+        fetchFromSameOrigin(file)
           .then((text) => {
             renderMarkdown(text);
           })
-          .catch(() => {
-            contentEl.textContent = "无法加载文章内容，请检查文件是否存在。";
-          });
+          .catch(() =>
+            fetchFromGitHub(file)
+              .then((text) => {
+                renderMarkdown(text);
+              })
+              .catch(() => {
+                contentEl.textContent =
+                  "无法加载文章内容，请检查文件是否存在或仓库是否公开。";
+              })
+          );
       }
     </script>
   </body>
