@@ -13,18 +13,59 @@
       <div id="article-content" class="article-content">正在加载...</div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
       const params = new URLSearchParams(window.location.search);
       const file = params.get("file");
       const titleEl = document.getElementById("article-title");
       const contentEl = document.getElementById("article-content");
+      const articleDir = "article";
+      const attachmentsDir = "attachments";
 
-      if (!file || !/^[\w.-]+\.txt$/i.test(file)) {
+      const normalizeImageUrl = (url) => {
+        if (!url) {
+          return "";
+        }
+        if (/^(https?:|data:|\/)/i.test(url)) {
+          return url;
+        }
+        let cleaned = url.replace(/^\.\/+/, "");
+        while (cleaned.startsWith("../")) {
+          cleaned = cleaned.slice(3);
+        }
+        if (
+          cleaned.startsWith(`${attachmentsDir}/`) ||
+          cleaned.startsWith(`${articleDir}/${attachmentsDir}/`)
+        ) {
+          return cleaned;
+        }
+        return `${attachmentsDir}/${cleaned}`;
+      };
+
+      const renderMarkdown = (text) => {
+        if (typeof marked === "undefined") {
+          contentEl.textContent = "Markdown 渲染库加载失败，请稍后重试。";
+          return;
+        }
+        const renderer = new marked.Renderer();
+        renderer.image = (href, title, text) => {
+          const src = normalizeImageUrl(href || "");
+          const titleAttr = title ? ` title="${title}"` : "";
+          const alt = text || "";
+          return `<img src="${src}" alt="${alt}"${titleAttr}>`;
+        };
+        marked.setOptions({ breaks: true, renderer });
+        contentEl.innerHTML = marked.parse(text);
+      };
+
+      if (!file || !/^[\w.-]+\.(md|markdown)$/i.test(file)) {
         titleEl.textContent = "无法读取文章";
         contentEl.textContent = "请从首页选择文章。";
       } else {
-        titleEl.textContent = file.replace(/\.txt$/i, "");
-        fetch(`article/${encodeURIComponent(file)}`)
+        titleEl.textContent = file
+          .replace(/\.markdown$/i, "")
+          .replace(/\.md$/i, "");
+        fetch(`${articleDir}/${encodeURIComponent(file)}`)
           .then((res) => {
             if (!res.ok) {
               throw new Error("文章不存在");
@@ -32,7 +73,7 @@
             return res.text();
           })
           .then((text) => {
-            contentEl.textContent = text;
+            renderMarkdown(text);
           })
           .catch(() => {
             contentEl.textContent = "无法加载文章内容，请检查文件是否存在。";

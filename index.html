@@ -60,7 +60,7 @@
       <main class="articles">
         <div class="articles-header">
           <h2>文章列表</h2>
-          <p class="hint">将 txt 文件放入 article 文件夹即可自动展示。</p>
+          <p class="hint">将 md 文件放入 article 文件夹即可自动展示。</p>
         </div>
         <div id="article-list" class="article-list">
           <div class="empty">正在加载文章...</div>
@@ -69,8 +69,17 @@
     </div>
 
     <script>
-      const repoOwner = "lem0npieee";
-      const repoName = "lem0npieee.github.io";
+      const defaultOwner = "lem0npieee";
+      const defaultRepo = "lem0npieee.github.io";
+      const host = window.location.hostname;
+      const inferredOwner = host.endsWith("github.io")
+        ? host.split(".")[0]
+        : defaultOwner;
+      const inferredRepo = host.endsWith("github.io")
+        ? `${inferredOwner}.github.io`
+        : defaultRepo;
+      const repoOwner = inferredOwner;
+      const repoName = inferredRepo;
       const articleDir = "article";
       const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${articleDir}`;
       const listEl = document.getElementById("article-list");
@@ -79,14 +88,28 @@
         listEl.innerHTML = `<div class="empty">${message}</div>`;
       };
 
+      const isMarkdown = (name) => /\.md$/i.test(name) || /\.markdown$/i.test(name);
+      const normalizeFileName = (href) => {
+        if (!href) {
+          return "";
+        }
+        const cleaned = href.split("?")[0].split("#")[0];
+        if (cleaned.endsWith("/")) {
+          return "";
+        }
+        const parts = cleaned.split("/");
+        return decodeURIComponent(parts[parts.length - 1] || "");
+      };
       const renderList = (files) => {
         if (!files.length) {
-          renderEmpty("暂时还没有文章，添加 txt 文件后会自动出现。");
+          renderEmpty("暂时还没有文章，请确认 md 文件已推送到 article 文件夹。");
           return;
         }
         listEl.innerHTML = files
           .map((file) => {
-            const title = file.name.replace(/\.txt$/i, "");
+            const title = file.name
+              .replace(/\.markdown$/i, "")
+              .replace(/\.md$/i, "");
             const link = `article.html?file=${encodeURIComponent(file.name)}`;
             return `<a class="article-item" href="${link}">
                 <div class="article-title">${title}</div>
@@ -96,22 +119,57 @@
           .join("");
       };
 
-      fetch(apiUrl)
-        .then((res) => {
-          if (!res.ok) {
-            throw new Error("无法获取文章列表");
-          }
-          return res.json();
-        })
-        .then((data) => {
-          const files = data
-            .filter((item) => item.type === "file" && item.name.endsWith(".txt"))
-            .sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
-          renderList(files);
-        })
-        .catch(() => {
-          renderEmpty("无法获取文章列表，请检查仓库是否公开且 article 目录存在。");
-        });
+      const fetchFromGitHub = () =>
+        fetch(apiUrl)
+          .then((res) => {
+            if (!res.ok) {
+              throw new Error("无法获取文章列表");
+            }
+            return res.json();
+          })
+          .then((data) => {
+            const files = data
+              .filter((item) => item.type === "file" && isMarkdown(item.name))
+              .sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
+            if (!files.length) {
+              throw new Error("empty");
+            }
+            return files;
+          });
+
+      const fetchFromDirectoryIndex = () =>
+        fetch(`${articleDir}/`)
+          .then((res) => {
+            if (!res.ok) {
+              throw new Error("无法读取目录索引");
+            }
+            return res.text();
+          })
+          .then((html) => {
+            const doc = new DOMParser().parseFromString(html, "text/html");
+            const names = Array.from(doc.querySelectorAll("a"))
+              .map((node) => normalizeFileName(node.getAttribute("href")))
+              .filter((name) => isMarkdown(name));
+            const unique = Array.from(new Set(names));
+            if (!unique.length) {
+              throw new Error("empty");
+            }
+            return unique.map((name) => ({ name }));
+          });
+
+      fetchFromGitHub()
+        .then((files) => renderList(files))
+        .catch(() =>
+          fetchFromDirectoryIndex()
+            .then((files) => renderList(files))
+            .catch(() => {
+              const message =
+                window.location.protocol === "file:"
+                  ? "本地预览请使用本地服务器（如 Live Server），否则无法读取目录。"
+                  : "无法获取文章列表，请检查仓库是否公开且 article 目录存在。";
+              renderEmpty(message);
+            })
+        );
     </script>
   </body>
 </html>

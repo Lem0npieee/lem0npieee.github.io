@@ -167,13 +167,68 @@ body {
 
 .article-content {
   margin-top: 16px;
-  white-space: pre-wrap;
+  white-space: normal;
   background: #ffffff;
   padding: 24px;
   border-radius: 18px;
   box-shadow: 0 12px 30px rgba(31, 36, 48, 0.08);
   line-height: 1.7;
   color: #2c3444;
+}
+
+.article-content h1,
+.article-content h2,
+.article-content h3 {
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+
+.article-content p {
+  margin: 0 0 12px;
+}
+
+.article-content ul,
+.article-content ol {
+  padding-left: 22px;
+  margin: 0 0 12px;
+}
+
+.article-content a {
+  color: #5a66f0;
+}
+
+.article-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 16px auto;
+  border-radius: 12px;
+  box-shadow: 0 10px 20px rgba(31, 36, 48, 0.12);
+}
+
+.article-content blockquote {
+  margin: 0 0 12px;
+  padding: 10px 16px;
+  background: #f5f7ff;
+  border-left: 4px solid #5a66f0;
+  color: #4b556a;
+}
+
+.article-content pre {
+  background: #1f2430;
+  color: #e7e9f3;
+  padding: 16px;
+  border-radius: 12px;
+  overflow-x: auto;
+  margin: 0 0 12px;
+}
+
+.article-content code {
+  background: #eef1f8;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 0.95em;
 }
 
 @media (max-width: 960px) {
