@@ -214,6 +214,12 @@ body {
   color: #4b556a;
 }
 
+.article-content mark {
+  background: #ffe8a3;
+  padding: 0 4px;
+  border-radius: 4px;
+}
+
 .article-content pre {
   background: #1f2430;
   color: #e7e9f3;
@@ -236,6 +242,48 @@ body {
   padding: 0;
   color: inherit;
   display: block;
+}
+
+.article-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+.article-content th,
+.article-content td {
+  border: 1px solid #e0e5f2;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.article-content thead {
+  background: #f5f7ff;
+}
+
+.article-content tbody tr:nth-child(even) {
+  background: #fafbff;
+}
+
+.article-content .task-item {
+  list-style: none;
+}
+
+.article-content input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+.article-content .footnotes {
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px solid #e6eaf4;
+  color: #5b657a;
+  font-size: 13px;
+}
+
+.article-content .footnotes ol {
+  padding-left: 18px;
 }
 
 @media (max-width: 960px) {

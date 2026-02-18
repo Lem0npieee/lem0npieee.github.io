@@ -61,7 +61,7 @@
           .replace(/"/g, "&quot;")
           .replace(/'/g, "&#39;");
 
-      const parseInline = (text) => {
+      const parseInline = (text, refs) => {
         const placeholders = [];
         const addPlaceholder = (html) => {
           const key = `@@@${placeholders.length}@@@`;
@@ -69,6 +69,25 @@
           return key;
         };
         let working = text || "";
+        const lookupRef = (key) => {
+          if (!key || !refs) {
+            return "";
+          }
+          const normalized = key.trim().toLowerCase();
+          return refs[normalized] || "";
+        };
+
+        working = working.replace(/!\[\[([^\]]+)\]\]/g, (_, raw) => {
+          const src = normalizeImageUrl(raw.trim());
+          return addPlaceholder(`<img src="${src}" alt="">`);
+        });
+
+        working = working.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, raw, label) => {
+          const target = raw.trim();
+          const href = normalizeImageUrl(target);
+          const safeLabel = escapeHtml((label || target).trim());
+          return addPlaceholder(`<a href="${href}">${safeLabel}</a>`);
+        });
 
         working = working.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => {
           const src = normalizeImageUrl(url.trim());
@@ -82,6 +101,35 @@
           return addPlaceholder(`<a href="${href}">${safeLabel}</a>`);
         });
 
+        working = working.replace(/\[([^\]]+)\]\s*\[([^\]]*)\]/g, (_, label, refKey) => {
+          const resolved = lookupRef(refKey || label);
+          if (!resolved) {
+            return _;
+          }
+          const safeLabel = escapeHtml(label || "");
+          return addPlaceholder(`<a href="${resolved}">${safeLabel}</a>`);
+        });
+
+        working = working.replace(/<([^>]+)>/g, (_, raw) => {
+          const trimmed = raw.trim();
+          if (/^(https?:\/\/|mailto:)/i.test(trimmed)) {
+            const safe = escapeHtml(trimmed);
+            return addPlaceholder(`<a href="${safe}">${safe}</a>`);
+          }
+          if (/^www\./i.test(trimmed)) {
+            const safe = escapeHtml(trimmed);
+            return addPlaceholder(`<a href="http://${safe}">${safe}</a>`);
+          }
+          return `&lt;${escapeHtml(trimmed)}&gt;`;
+        });
+
+        working = working.replace(/\[\^([^\]]+)\]/g, (_, id) => {
+          const safeId = escapeHtml(id);
+          return addPlaceholder(
+            `<sup id="fnref-${safeId}"><a href="#fn-${safeId}">${safeId}</a></sup>`
+          );
+        });
+
         const segments = working.split(/`/);
         const parsed = segments
           .map((segment, index) => {
@@ -89,8 +137,11 @@
               return `<code>${escapeHtml(segment)}</code>`;
             }
             let safe = escapeHtml(segment);
+            safe = safe.replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>");
             safe = safe.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
             safe = safe.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+            safe = safe.replace(/~~([^~]+)~~/g, "<del>$1</del>");
+            safe = safe.replace(/==([^=]+)==/g, "<mark>$1</mark>");
             return safe;
           })
           .join("");
@@ -103,17 +154,58 @@
 
       const markdownToHtml = (text) => {
         const lines = (text || "").replace(/\r\n/g, "\n").split("\n");
+        const refs = {};
+        const footnotes = {};
+        const footnoteOrder = [];
+
+        for (let i = 0; i < lines.length; i += 1) {
+          const line = lines[i];
+          const refMatch = line.match(/^\[([^\]]+)\]:\s+(.+)$/);
+          if (refMatch) {
+            refs[refMatch[1].trim().toLowerCase()] = refMatch[2].trim();
+            lines[i] = "";
+            continue;
+          }
+          const footnoteMatch = line.match(/^\[\^([^\]]+)\]:\s*(.*)$/);
+          if (footnoteMatch) {
+            const id = footnoteMatch[1].trim();
+            const collected = [footnoteMatch[2] || ""];
+            let j = i + 1;
+            while (j < lines.length && /^\s{4,}|^\t/.test(lines[j])) {
+              collected.push(lines[j].replace(/^\s{4}|^\t/, ""));
+              lines[j] = "";
+              j += 1;
+            }
+            lines[i] = "";
+            footnotes[id] = collected.join("\n").trim();
+            footnoteOrder.push(id);
+          }
+        }
         let html = "";
         let inCode = false;
         let codeLang = "";
         let codeLines = [];
-        let listType = null;
+        let listStack = [];
+        let blockquoteLevel = 0;
+        let inIndentedCode = false;
+        let indentedCodeLines = [];
+
+        const closeBlockquotes = () => {
+          while (blockquoteLevel > 0) {
+            html += "</blockquote>";
+            blockquoteLevel -= 1;
+          }
+        };
+
+        const closeLists = (targetLevel = 0) => {
+          while (listStack.length > targetLevel) {
+            const last = listStack.pop();
+            html += `</${last}>`;
+          }
+        };
 
         const flushList = () => {
-          if (listType) {
-            html += `</${listType}>`;
-            listType = null;
-          }
+          closeLists(0);
         };
 
         const flushCode = () => {
@@ -128,70 +220,195 @@
           codeLines = [];
         };
 
-        lines.forEach((line) => {
+        const flushIndentedCode = () => {
+          if (!inIndentedCode) {
+            return;
+          }
+          const code = escapeHtml(indentedCodeLines.join("\n"));
+          html += `<pre><code>${code}</code></pre>`;
+          inIndentedCode = false;
+          indentedCodeLines = [];
+        };
+
+        const splitTableRow = (row) => {
+          let trimmed = row.trim();
+          if (trimmed.startsWith("|")) {
+            trimmed = trimmed.slice(1);
+          }
+          if (trimmed.endsWith("|")) {
+            trimmed = trimmed.slice(0, -1);
+          }
+          return trimmed.split("|").map((cell) => cell.trim());
+        };
+
+        const isTableSeparator = (row) =>
+          /^(\s*\|)?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+(\|)?\s*$/.test(row);
+
+        const renderTable = (startIndex) => {
+          const header = splitTableRow(lines[startIndex]);
+          let index = startIndex + 2;
+          const bodyRows = [];
+          while (index < lines.length) {
+            const row = lines[index];
+            if (!row.trim() || !row.includes("|")) {
+              break;
+            }
+            bodyRows.push(splitTableRow(row));
+            index += 1;
+          }
+          const headerHtml = header
+            .map((cell) => `<th>${parseInline(cell, refs)}</th>`)
+            .join("");
+          const bodyHtml = bodyRows
+            .map(
+              (row) =>
+                `<tr>${row
+                  .map((cell) => `<td>${parseInline(cell, refs)}</td>`)
+                  .join("")}</tr>`
+            )
+            .join("");
+          html += `<table><thead><tr>${headerHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>`;
+          return index;
+        };
+
+        for (let i = 0; i < lines.length; i += 1) {
+          const line = lines[i];
           if (line.startsWith("```")) {
+            flushIndentedCode();
             if (inCode) {
               flushCode();
             } else {
               flushList();
+              closeBlockquotes();
               inCode = true;
               codeLang = line.slice(3).trim();
             }
-            return;
+            continue;
           }
 
           if (inCode) {
             codeLines.push(line);
-            return;
+            continue;
+          }
+
+          if (/^\s{4,}|^\t/.test(line)) {
+            flushList();
+            closeBlockquotes();
+            inIndentedCode = true;
+            indentedCodeLines.push(line.replace(/^\s{4}|^\t/, ""));
+            continue;
+          }
+          if (inIndentedCode) {
+            flushIndentedCode();
           }
 
           if (!line.trim()) {
             flushList();
-            return;
+            closeBlockquotes();
+            continue;
           }
 
-          const headingMatch = line.match(/^(#{1,3})\s+(.*)$/);
+          const setextMatch =
+            i + 1 < lines.length ? lines[i + 1].match(/^(=+|-+)\s*$/) : null;
+          if (setextMatch) {
+            flushList();
+            closeBlockquotes();
+            const level = setextMatch[1].startsWith("=") ? 1 : 2;
+            html += `<h${level}>${parseInline(line.trim(), refs)}</h${level}>`;
+            i += 1;
+            continue;
+          }
+
+          const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
           if (headingMatch) {
             flushList();
+            closeBlockquotes();
             const level = headingMatch[1].length;
-            html += `<h${level}>${parseInline(headingMatch[2])}</h${level}>`;
-            return;
+            html += `<h${level}>${parseInline(headingMatch[2], refs)}</h${level}>`;
+            continue;
           }
 
-          if (/^>\s?/.test(line)) {
+          const blockquoteMatch = line.match(/^(>+)\s?(.*)$/);
+          if (blockquoteMatch) {
             flushList();
-            html += `<blockquote>${parseInline(line.replace(/^>\s?/, ""))}</blockquote>`;
-            return;
+            const targetLevel = blockquoteMatch[1].length;
+            while (blockquoteLevel < targetLevel) {
+              html += "<blockquote>";
+              blockquoteLevel += 1;
+            }
+            while (blockquoteLevel > targetLevel) {
+              html += "</blockquote>";
+              blockquoteLevel -= 1;
+            }
+            if (blockquoteMatch[2]) {
+              html += `<p>${parseInline(blockquoteMatch[2], refs)}</p>`;
+            }
+            continue;
           }
 
-          const unorderedMatch = line.match(/^[-*]\s+(.*)$/);
-          if (unorderedMatch) {
-            if (listType !== "ul") {
-              flushList();
-              listType = "ul";
-              html += "<ul>";
-            }
-            html += `<li>${parseInline(unorderedMatch[1])}</li>`;
-            return;
+          closeBlockquotes();
+
+          if (/^(\*\s*\*\s*\*|-{3,}|_{3,})\s*$/.test(line)) {
+            flushList();
+            html += "<hr>";
+            continue;
           }
 
-          const orderedMatch = line.match(/^\d+\.\s+(.*)$/);
-          if (orderedMatch) {
-            if (listType !== "ol") {
-              flushList();
-              listType = "ol";
-              html += "<ol>";
+          if (line.includes("|") && i + 1 < lines.length && isTableSeparator(lines[i + 1])) {
+            flushList();
+            i = renderTable(i) - 1;
+            continue;
+          }
+
+          const listMatch = line.match(/^(\s*)([-*+]|\d+\.)\s+(.*)$/);
+          if (listMatch) {
+            const indent = listMatch[1].replace(/\t/g, "    ").length;
+            const depth = Math.floor(indent / 2) + 1;
+            const type = /\d+\./.test(listMatch[2]) ? "ol" : "ul";
+            if (listStack.length > depth) {
+              closeLists(depth);
             }
-            html += `<li>${parseInline(orderedMatch[1])}</li>`;
-            return;
+            if (listStack.length === depth && listStack[listStack.length - 1] !== type) {
+              closeLists(depth);
+            }
+            while (listStack.length < depth) {
+              listStack.push(type);
+              html += `<${type}>`;
+            }
+            let itemText = listMatch[3];
+            const taskMatch = itemText.match(/^\[([ xX])\]\s+(.*)$/);
+            if (taskMatch) {
+              const checked = taskMatch[1].toLowerCase() === "x" ? " checked" : "";
+              itemText = taskMatch[2];
+              html += `<li class="task-item"><input type="checkbox" disabled${checked}>${parseInline(
+                itemText,
+                refs
+              )}</li>`;
+            } else {
+              html += `<li>${parseInline(itemText, refs)}</li>`;
+            }
+            continue;
           }
 
           flushList();
-          html += `<p>${parseInline(line)}</p>`;
-        });
+          html += `<p>${parseInline(line, refs)}</p>`;
+        }
 
         flushList();
         flushCode();
+        flushIndentedCode();
+        closeBlockquotes();
+
+        if (footnoteOrder.length) {
+          const footnoteItems = footnoteOrder
+            .map((id) => {
+              const safeId = escapeHtml(id);
+              const body = parseInline(footnotes[id] || "", refs);
+              return `<li id="fn-${safeId}">${body} <a href="#fnref-${safeId}">↩</a></li>`;
+            })
+            .join("");
+          html += `<section class="footnotes"><ol>${footnoteItems}</ol></section>`;
+        }
 
         return html;
       };
