@@ -46,6 +46,10 @@
           return url;
         }
         let cleaned = url.replace(/^\.\/+/, "");
+        if (cleaned.includes("|")) {
+          cleaned = cleaned.split("|")[0];
+        }
+        cleaned = cleaned.trim();
         while (cleaned.startsWith("../")) {
           cleaned = cleaned.slice(3);
         }
