@@ -55,9 +55,33 @@
             </li>
           </ul>
         </div>
+        <div class="status-card">
+          <h2 class="section-title">我的状态</h2>
+          <ul class="status-list">
+            <li>
+              <span class="status-dot">●</span>
+              <span>最近在搞：科研实习 + 刷Leetcode</span>
+            </li>
+            <li>
+              <span class="status-dot">●</span>
+              <span>最近在学：Agent构建</span>
+            </li>
+            <li>
+              <span class="status-dot">●</span>
+              <span>正在读：《我看见的世界》 by Feifei Li</span>
+            </li>
+          </ul>
+        </div>
       </aside>
 
       <main class="articles">
+        <section class="quote-card">
+          <div class="quote-title">随机碎碎念</div>
+          <p id="daily-quote" class="quote-text">正在加载一句话...</p>
+          <button id="quote-refresh" class="quote-refresh" type="button">
+            换一句
+          </button>
+        </section>
         <div class="articles-header">
           <h2>文章列表</h2>
           <p class="hint">将 md 文件放入 article 文件夹即可自动展示。</p>
@@ -83,9 +107,32 @@
       const articleDir = "article";
       const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${articleDir}`;
       const listEl = document.getElementById("article-list");
+      const quoteEl = document.getElementById("daily-quote");
+      const quoteBtn = document.getElementById("quote-refresh");
+
+      const quotes = [
+        "今天也在训练自己的直觉和耐心。",
+        "写博客像整理房间：整理完心情也会更干净。",
+        "把问题拆小一点，它就会开始变可爱。",
+        "灵感不是闪电，更多是不断敲门。",
+        "今天的进度，哪怕只有 1%。",
+        "少一点完美主义，多一点行动主义。",
+        "做一个有输出的人，哪怕输出很小。",
+        "写下来，事情就开始可控了。",
+        "学习像走路，慢也能到。",
+        "让好奇心当导航。"
+      ];
 
       const renderEmpty = (message) => {
         listEl.innerHTML = `<div class="empty">${message}</div>`;
+      };
+
+      const setRandomQuote = () => {
+        if (!quoteEl) {
+          return;
+        }
+        const index = Math.floor(Math.random() * quotes.length);
+        quoteEl.textContent = quotes[index];
       };
 
       const isMarkdown = (name) => /\.md$/i.test(name) || /\.markdown$/i.test(name);
@@ -170,6 +217,11 @@
               renderEmpty(message);
             })
         );
+
+      setRandomQuote();
+      if (quoteBtn) {
+        quoteBtn.addEventListener("click", setRandomQuote);
+      }
     </script>
   </body>
 </html>

@@ -1,11 +1,13 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=ZCOOL+KuaiLe&display=swap");
+
 * {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  background: #f4f6fb;
+  font-family: "Plus Jakarta Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: radial-gradient(circle at top left, #f8fbff 0%, #f4f6fb 35%, #edf0f8 100%);
   color: #1f2430;
 }
 
@@ -41,6 +43,7 @@ body {
   margin: 16px 0 4px;
   font-size: 28px;
   text-align: center;
+  font-family: "ZCOOL KuaiLe", "Plus Jakarta Sans", sans-serif;
 }
 
 .tagline {
@@ -53,6 +56,30 @@ body {
   background: #f8f9fe;
   padding: 18px;
   border-radius: 16px;
+}
+
+.status-card {
+  margin-top: 18px;
+  background: #fff7ec;
+  padding: 18px;
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 1px rgba(255, 173, 72, 0.25);
+}
+
+.status-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+  font-size: 14px;
+  color: #4d3b25;
+}
+
+.status-dot {
+  color: #ff9a3d;
+  margin-right: 8px;
+  font-size: 12px;
 }
 
 .section-title {
@@ -90,6 +117,55 @@ body {
   padding: 28px;
   box-shadow: 0 12px 30px rgba(31, 36, 48, 0.08);
   min-height: 480px;
+}
+
+.quote-card {
+  margin-bottom: 20px;
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: linear-gradient(120deg, #eef6ff 0%, #fdf6ff 100%);
+  border: 1px solid rgba(90, 102, 240, 0.12);
+  position: relative;
+  overflow: hidden;
+}
+
+.quote-card::after {
+  content: "";
+  position: absolute;
+  right: -40px;
+  top: -40px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(90, 102, 240, 0.12);
+}
+
+.quote-title {
+  font-weight: 700;
+  color: #28314a;
+  margin-bottom: 8px;
+}
+
+.quote-text {
+  margin: 0 0 12px;
+  color: #4a5670;
+  line-height: 1.6;
+}
+
+.quote-refresh {
+  border: none;
+  background: #5a66f0;
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.quote-refresh:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px rgba(90, 102, 240, 0.25);
 }
 
 .articles-header {
