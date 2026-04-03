@@ -46,10 +46,6 @@
           return url;
         }
         let cleaned = url.replace(/^\.\/+/, "");
-        if (cleaned.includes("|")) {
-          cleaned = cleaned.split("|")[0];
-        }
-        cleaned = cleaned.trim();
         while (cleaned.startsWith("../")) {
           cleaned = cleaned.slice(3);
         }
@@ -93,8 +89,12 @@
         };
 
         working = working.replace(/!\[\[([^\]]+)\]\]/g, (_, raw) => {
-          const src = normalizeImageUrl(raw.trim());
-          return addPlaceholder(`<img src="${src}" alt="">`);
+          const parts = raw.split("|").map((part) => part.trim());
+          const target = parts[0] || "";
+          const size = parts[1] || "";
+          const src = normalizeImageUrl(target);
+          const width = size && /^\d+$/.test(size) ? ` width="${size}"` : "";
+          return addPlaceholder(`<img src="${src}" alt=""${width}>`);
         });
 
         working = working.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, raw, label) => {
